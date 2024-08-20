@@ -1,0 +1,52 @@
+# This comment represents a change, that has no effect on the rendered template
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: dcgm-exporter
+  namespace: dcgm-exporter
+spec:
+  interval: 15m
+  url: https://nvidia.github.io/dcgm-exporter/helm-charts
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta2
+kind: HelmRelease
+metadata:
+  name: dcgm-exporter
+  namespace: dcgm-exporter
+spec:
+  interval: 5m
+  targetNamespace: dcgm-exporter
+  chart:
+    spec:
+      chart: dcgm-exporter
+      version: "3.5.0"
+      sourceRef:
+        kind: HelmRepository
+        name: dcgm-exporter
+      interval: 15m
+  install:
+    skipCRDs: true
+  values:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 256Mi
+    priorityClassName: infrastructure
+    nodeSelector:
+      nvidia.com/gpu: "true"
+    tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    serviceMonitor:
+      interval: 120s
+      additionalLabels:
+        instance: primary
+    rollingUpdate:
+      maxUnavailable: 25%

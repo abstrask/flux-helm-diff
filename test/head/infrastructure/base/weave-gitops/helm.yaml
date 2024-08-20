@@ -1,0 +1,53 @@
+# Some modification
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository
+metadata:
+  name: weave-gitops
+  namespace: flux-system
+spec:
+  interval: 15m
+  type: oci
+  url: oci://ghcr.io/weaveworks/charts
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: weave-gitops
+  namespace: flux-system
+spec:
+  interval: 5m
+  dependsOn:
+    - name: aws-lb-controller
+      namespace: aws-lb-controller
+  targetNamespace: flux-system
+  chart:
+    spec:
+      chart: weave-gitops
+      version: "4.0.36"
+      sourceRef:
+        kind: HelmRepository
+        name: weave-gitops
+      interval: 15m
+  install:
+    skipCRDs: true
+  values:
+    adminUser:
+      create: true
+      passwordHash: $2a$10$fGuQSq7OYe0AxvsQ2DCPH.yValqESxR7hUgLK1rR7sUWjr8kyU5Hm
+      username: admin
+    ingress:
+      enabled: true
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt
+      className: nginx
+      hosts:
+        - host: gitops.${flux_base_domain_name}
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: gitops-tls
+          hosts:
+            - gitops.${flux_base_domain_name}

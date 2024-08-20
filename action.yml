@@ -1,0 +1,30 @@
+name: "Flux Helm diff"
+description: "Flux (GitOps Toolkit) Helm diff Docker action"
+
+inputs:
+  helm_files:
+    description: "Path of Helm files to compare"
+    required: true
+
+outputs:
+  diff_markdown:
+    description: "Human-readable diff report in Markdown format, e.g. for mshick/add-pr-comment"
+    value: ${{ steps.diff.outputs.markdown}}
+
+  any_failed:
+    description: "Errors encountered rendering any of the Helm files (can be used to cause entire workflow to fail)"
+    value: ${{ steps.diff.outputs.any_failed}}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set GitHub Path
+      run: echo "$GITHUB_ACTION_PATH" >> $GITHUB_PATH
+      shell: bash
+      env:
+        GITHUB_ACTION_PATH: ${{ github.action_path }}
+
+    - id: diff
+      name: Helm diff
+      run: flux-helm-diff.sh ${{ inputs.helm_files }}
+      shell: bash
