@@ -8,7 +8,7 @@ It extracts the repo URL, chart name and version and values, and renders the sup
 
 It makes it easy to determine the *effect* on the rendered Kubernetes manifests, e.g. when bumping chart version or changing the supplied Helm values.
 
-Combine with these awesome projects for maximum smoothness:
+Combine with these awesome projects for maximum workflow smoothness:
 
 - [dorny/paths-filter](https://github.com/dorny/paths-filter): Only run workflow if Helm files were changed
 - [alexellis/arkade-get](https://github.com/alexellis/arkade-get): Install dependencies
