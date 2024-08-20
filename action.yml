@@ -1,5 +1,8 @@
 name: "Flux Helm diff"
 description: "Flux (GitOps Toolkit) Helm diff Docker action"
+branding:
+  icon: "file-text"
+  color: "blue"
 
 inputs:
   helm_files:
