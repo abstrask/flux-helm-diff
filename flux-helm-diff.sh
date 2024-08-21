@@ -35,8 +35,15 @@ helm_template() {
     values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
     echo "Chart version ${1}: $version ($chart from $url)" >&2
 
+    # Syntax for chart repos is different from OCI repos
+    if [[ "${url}" = "oci://"* ]]; then
+        chart_args=("${url}/${chart}") # treat as array, to avoid adding single-quotes
+    else
+        chart_args=("${chart}" --repo "${url}")
+    fi
+
     # Render template
-    template_out=$(helm template "${name}" -n "${namespace}" "${chart}" --repo "${url}" --version "${version}" -f <(echo "${values}")  2>&1) || {
+    template_out=$(helm template "${name}" ${chart_args[@]} --version "${version}" -n "${namespace}" -f <(echo "${values}")  2>&1) || {
         echo "$template_out"
         echo "$template_out" >&2
         return 1
