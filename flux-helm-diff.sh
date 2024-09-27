@@ -9,6 +9,7 @@ fi
 echo "${#helm_files[@]} Helm file(s) to render: ${helm_files[*]}"
 
 helm_template() {
+    set -eu -o pipefail
     if [ -z "${1}" ]; then
         echo "Error: Need file name to template" >&2
         return 2
@@ -18,7 +19,7 @@ helm_template() {
     ref="${1%%/*}"
 
     # Set test = <something> to run against Helm teplates under test/
-    if [ -z "${TEST}" ]; then
+    if [ -z "${TEST:-}" ]; then
         helm_file="${1}"
     else
         helm_file="test/${1}"
