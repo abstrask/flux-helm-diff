@@ -27,14 +27,14 @@ jobs:
           path: base
 
       - id: checkout_head
-        uses: actions/checkout@V4
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
           path: head
 
       - name: Get all Helm files
         id: all_files_helm
-        uses: tj-actions/glob@v22.0.1
+        uses: tj-actions/glob@v22
         with:
           files: |
             test/head/infrastructure/base/*/helm.yaml
