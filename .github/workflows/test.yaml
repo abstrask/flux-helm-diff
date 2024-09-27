@@ -39,6 +39,12 @@ jobs:
           files: |
             test/head/infrastructure/base/*/helm.yaml
 
+      - name: Set GitHub Path
+        run: echo "$GITHUB_ACTION_PATH" >> $GITHUB_PATH
+        shell: bash
+        env:
+          GITHUB_ACTION_PATH: ${{ github.action_path }}
+
       - id: helm_diff
         name: Helm diff
         run: flux-helm-diff.sh
@@ -46,7 +52,6 @@ jobs:
           TEST: "1"
           HELM_FILES: ${{ steps.all_files_helm.outputs.paths }}
         shell: bash
-
 
       - id: pr_comment
         name: Add PR comment
