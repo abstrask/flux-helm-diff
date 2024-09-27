@@ -5,31 +5,8 @@ name: Test Helm diff
 on:
   - pull_request_target
 jobs:
-  path_filter:
-    name: Filter Helm templates
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read # fix "Resource not accessible by integration" error
-    outputs:
-      helm: ${{ steps.filter.outputs.helm }}
-    steps:
-      - id: checkout_head
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            helm:
-              - 'test/head/infrastructure/base/*/helm.yaml'
-
   helm_diff:
     name: Diff changed Helm templates
-    needs: path_filter
-    if: ${{ needs.path_filter.outputs.helm == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
