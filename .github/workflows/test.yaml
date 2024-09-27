@@ -24,7 +24,7 @@ jobs:
         with:
           filters: |
             helm:
-              - 'infrastructure/base/*/helm.yaml'
+              - 'test/head/infrastructure/base/*/helm.yaml'
 
   helm_diff:
     name: Diff changed Helm templates
@@ -60,7 +60,7 @@ jobs:
         uses: tj-actions/glob@v44
         with:
           files: |
-            infrastructure/base/*/helm.yaml
+            test/head/infrastructure/base/*/helm.yaml
 
       - id: helm_diff
         name: Helm diff
