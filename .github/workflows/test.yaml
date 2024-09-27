@@ -1,0 +1,59 @@
+# https://github.com/recoord/flux-infrastructure/blob/dev/.github/workflows/update-crds.yml
+# https://github.com/recoord/core-devops-engine-k8s-manifests/blob/main/.github/workflows/diff.yml
+
+name: Test Helm diff
+on:
+  - pull_request_target
+jobs:
+  helm_diff:
+    name: Diff changed Helm templates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - id: dependencies
+        name: Install dependencies
+        uses: alexellis/arkade-get@master
+        with:
+          helm: latest
+          yq: latest
+
+      - id: checkout_base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - id: checkout_head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          path: head
+
+      - name: Get all Helm files
+        id: all_files_helm
+        run: |
+          helm_files=($(find ./head/test/head -type f -name 'helm.yaml' | sed "s|^./head/test/head/||" | sort))
+          echo HELM_FILES="${helm_files[@]}" >> $GITHUB_OUTPUT
+          ls -lR
+
+      - id: helm_diff
+        name: Helm diff
+        run: ../head/flux-helm-diff.sh
+        working-directory: ./base
+        env:
+          TEST: "1"
+          HELM_FILES: ${{ steps.all_files_helm.outputs.HELM_FILES }}
+        shell: bash
+
+      - id: pr_comment
+        name: Add PR comment
+        uses: mshick/add-pr-comment@v2
+        if: contains(fromJSON('["pull_request_target"]'), github.event_name)
+        with:
+          message-id: diff
+          refresh-message-position: true
+          message: |
+            ${{ steps.helm_diff.outputs.markdown }}

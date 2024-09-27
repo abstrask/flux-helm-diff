@@ -1,0 +1,56 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: metaflow-tools
+  namespace: metaflow
+spec:
+  interval: 15m
+  url: https://github.com/outerbounds/metaflow-tools
+  ref:
+    tag: v2.0.0
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metaflow
+  namespace: metaflow
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: ./k8s/helm/metaflow/
+      version: "0.1.0"
+      sourceRef:
+        kind: GitRepository
+        name: metaflow-tools
+        namespace: metaflow
+      interval: 15m
+  values:
+    metaflow-service:
+      fullnameOverride: metaflow-service
+
+      replicaCount: 2
+
+      serviceAccount:
+        create: false
+        name: "metaflow"
+
+      ingress:
+        enabled: false
+
+    metaflow-ui:
+      fullnameOverride: metaflow-ui
+
+      replicaCount: 2
+
+      serviceAccount:
+        create: false
+        name: "metaflow"
+
+      ingress:
+        enabled: false
+
+    postgresql:
+      enabled: false

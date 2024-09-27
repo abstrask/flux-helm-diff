@@ -1,7 +1,5 @@
 # Flux Helm chart diff action
 
-![](https://github.com/abstrask/actions-playground/actions/workflows/helm-diff.yaml/badge.svg)
-
 A composite GitHub Action for use with PR workflows in repos with [Flux Helm manifests](https://fluxcd.io/flux/use-cases/helm/).
 
 It extracts the repo URL, chart name and version and values, and renders the supplied list of templates before and after PR, and produce a diff report in markdown format.
@@ -44,7 +42,7 @@ In `diff_markdown` the output for each file will either be:
   name: Flux Helm diff
   uses: abstrask/flux-helm-diff@main
   with:
-    helm_files: ${{ steps.changed_files_helm.outputs.modified_files }}
+    helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
 ```
 
 ### Full Example
@@ -71,7 +69,7 @@ jobs:
     outputs:
       helm: ${{ steps.filter.outputs.helm }}
     steps:
-      - id: checkout_base
+      - id: checkout_head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
@@ -143,7 +141,7 @@ Render templates and generate diff report:
         name: Helm diff
         uses: abstrask/actions-playground@main
         with:
-          helm_files: ${{ steps.changed_files_helm.outputs.modified_files }}
+          helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
 
 ```
 
@@ -253,13 +251,20 @@ No changes
 (abbreviated)
 ```
 
-### infrastructure/base/weave-gitops/helm.yaml
-```
-Error: looks like "oci://ghcr.io/weaveworks/charts" is not a valid chart repository or cannot be reached: object required
-```
-
-## Testing Locally
+## Testing
 
 ```bash
-GITHUB_OUTPUT=debug.out test=1 ./flux-helm-diff.sh helm1.yaml infrastructure/base/weave-gitops/helm.yaml infrastructure/base/nvidia-device-plugin/helm.yaml; cat debug.out
+helm_files=($(find ./test/head -type f -name 'helm.yaml' | sed "s|^./test/head/||" | sort))
+GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh; cat debug.out
 ```
+
+### Testing files
+
+| Name                    | Scenario tested                                                              | Expected output                                 |
+| ----------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                           | Diff shows entire rendered template as added    |
+| `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported) | TBD                                             |
+| `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                     | Diff (with potentially breaking `nodeAffinity`) |
+| `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository    | No changes                                      |
+| `weave-gitops-helmrepo` | HelmRepository with type `oci`                                               | Diff                                            |
+| `weave-gitops-ocirepo`  | OCIRepository                                                                | Diff                                            |
