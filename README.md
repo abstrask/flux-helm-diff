@@ -177,12 +177,12 @@ See [example-workflow.yaml](example-workflow.yaml) for coherent example.
 ## Example Output/PR comment
 
 ### infrastructure/base/dcgm-exporter/helm.yaml
-```
+```diff
 No changes
 ```
 
 ### infrastructure/base/nvidia-device-plugin/helm.yaml
-```
+```diff
 (abbreviated)
 
 +# Source: nvidia-device-plugin/templates/daemonset-device-plugin.yml
