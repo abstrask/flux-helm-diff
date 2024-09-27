@@ -1,0 +1,81 @@
+# https://github.com/recoord/flux-infrastructure/blob/dev/.github/workflows/update-crds.yml
+# https://github.com/recoord/core-devops-engine-k8s-manifests/blob/main/.github/workflows/diff.yml
+
+name: Test Helm diff
+on:
+  - pull_request_target
+jobs:
+  path_filter:
+    name: Filter Helm templates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # fix "Resource not accessible by integration" error
+    outputs:
+      helm: ${{ steps.filter.outputs.helm }}
+    steps:
+      - id: checkout_head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            helm:
+              - 'infrastructure/base/*/helm.yaml'
+
+  helm_diff:
+    name: Diff changed Helm templates
+    needs: path_filter
+    if: ${{ needs.path_filter.outputs.helm == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - id: dependencies
+        name: Install dependencies
+        uses: alexellis/arkade-get@master
+        with:
+          helm: latest
+          yq: latest
+
+      - id: checkout_base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - id: checkout_head
+        uses: actions/checkout@V4
+        with:
+          ref: ${{ github.head_ref }}
+          path: head
+
+      - name: Get changed Helm files
+        id: changed_files_helm
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            infrastructure/base/*/helm.yaml
+
+      - id: helm_diff
+        name: Helm diff
+        uses: abstrask/flux-helm-diff@dev
+        env:
+          TEST: "1"
+        with:
+          helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
+
+      - id: pr_comment
+        name: Add PR comment
+        uses: mshick/add-pr-comment@v2
+        if: contains(fromJSON('["pull_request_target"]'), github.event_name)
+        with:
+          message-id: diff
+          refresh-message-position: true
+          message: |
+            ${{ steps.helm_diff.outputs.diff_markdown }}
