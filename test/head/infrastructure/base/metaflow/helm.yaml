@@ -21,7 +21,7 @@ spec:
   chart:
     spec:
       chart: ./k8s/helm/metaflow/
-      version: '0.1.1'
+      version: "0.0.1"
       sourceRef:
         kind: GitRepository
         name: metaflow-tools
