@@ -29,5 +29,7 @@ runs:
 
     - id: diff
       name: Helm diff
-      run: flux-helm-diff.sh ${{ inputs.helm_files }}
+      run: flux-helm-diff.sh
+      env:
+        HELM_FILES: ${{ inputs.helm_files }}
       shell: bash

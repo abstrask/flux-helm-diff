@@ -12,7 +12,7 @@ jobs:
     outputs:
       helm: ${{ steps.filter.outputs.helm }}
     steps:
-      - id: checkout_base
+      - id: checkout_head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref }}
@@ -64,7 +64,7 @@ jobs:
         name: Helm diff
         uses: abstrask/flux-helm-diff@main
         with:
-          helm_files: ${{ steps.changed_files_helm.outputs.modified_files }}
+          helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
 
       - id: pr_comment
         name: Add PR comment
