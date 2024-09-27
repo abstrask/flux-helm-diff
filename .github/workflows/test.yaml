@@ -55,9 +55,9 @@ jobs:
           ref: ${{ github.head_ref }}
           path: head
 
-      - name: Get changed Helm files
-        id: changed_files_helm
-        uses: tj-actions/changed-files@v44
+      - name: Get all Helm files
+        id: all_files_helm
+        uses: tj-actions/glob@v44
         with:
           files: |
             infrastructure/base/*/helm.yaml
@@ -68,7 +68,7 @@ jobs:
         env:
           TEST: "1"
         with:
-          helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
+          helm_files: ${{ steps.all_files_helm.outputs.paths }}
 
       - id: pr_comment
         name: Add PR comment
