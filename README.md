@@ -268,12 +268,3 @@ GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh
 | `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository    | No changes                                      |
 | `weave-gitops-helmrepo` | HelmRepository with type `oci`                                               | Diff                                            |
 | `weave-gitops-ocirepo`  | OCIRepository                                                                | Diff                                            |
-
-## Known Shortcomings
-
-- [x] Charts installed via OCI repositories fail to render, because the helm template syntax is unnecessarily inconsistent
-- [x] Difficult to test locally - pass files as variable instead?
-- [x] Also produce report for new Helm files added
-- [ ] Potentially also support “in-tree” charts, GitRepository source, (like Metaflow), that are not packaged separately
-- [ ] Kustomize diff too?
-- [ ] Naively assumes there exactly only chart source in the Helm file. Could select by ${repo_name} so be sure.
