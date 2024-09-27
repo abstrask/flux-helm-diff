@@ -64,11 +64,12 @@ jobs:
 
       - id: helm_diff
         name: Helm diff
-        uses: abstrask/flux-helm-diff@dev
+        run: flux-helm-diff.sh
         env:
           TEST: "1"
-        with:
-          helm_files: ${{ steps.all_files_helm.outputs.paths }}
+          HELM_FILES: ${{ steps.all_files_helm.outputs.paths }}
+        shell: bash
+
 
       - id: pr_comment
         name: Add PR comment
