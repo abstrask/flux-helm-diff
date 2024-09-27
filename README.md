@@ -251,11 +251,6 @@ No changes
 (abbreviated)
 ```
 
-### infrastructure/base/weave-gitops/helm.yaml
-```
-Error: looks like "oci://ghcr.io/weaveworks/charts" is not a valid chart repository or cannot be reached: object required
-```
-
 ## Testing
 
 ```bash
