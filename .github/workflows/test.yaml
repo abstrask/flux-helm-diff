@@ -34,23 +34,18 @@ jobs:
 
       - name: Get all Helm files
         id: all_files_helm
-        uses: tj-actions/glob@v22
-        with:
-          files: |
-            test/head/infrastructure/base/*/helm.yaml
-
-      - name: Set GitHub Path
-        run: echo "$GITHUB_ACTION_PATH" >> $GITHUB_PATH
-        shell: bash
-        env:
-          GITHUB_ACTION_PATH: ${{ github.action_path }}
+        run: |
+          helm_files=($(find ./head/test/head -type f -name 'helm.yaml' | sed "s|^./head/test/head/||" | sort))
+          echo HELM_FILES="${helm_files[@]}" >> $GITHUB_OUTPUT
+          ls -lR
 
       - id: helm_diff
         name: Helm diff
-        run: flux-helm-diff.sh
+        run: ../head/flux-helm-diff.sh
+        working-directory: ./base
         env:
           TEST: "1"
-          HELM_FILES: ${{ steps.all_files_helm.outputs.paths }}
+          HELM_FILES: ${{ steps.all_files_helm.outputs.HELM_FILES }}
         shell: bash
 
       - id: pr_comment
@@ -61,4 +56,4 @@ jobs:
           message-id: diff
           refresh-message-position: true
           message: |
-            ${{ steps.helm_diff.outputs.diff_markdown }}
+            ${{ steps.helm_diff.outputs.markdown }}
