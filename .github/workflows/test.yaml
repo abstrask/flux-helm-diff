@@ -34,7 +34,7 @@ jobs:
 
       - name: Get all Helm files
         id: all_files_helm
-        uses: tj-actions/glob@v44
+        uses: tj-actions/glob@v22.0.1
         with:
           files: |
             test/head/infrastructure/base/*/helm.yaml
