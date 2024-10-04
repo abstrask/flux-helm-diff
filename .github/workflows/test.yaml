@@ -1,6 +1,3 @@
-# https://github.com/recoord/flux-infrastructure/blob/dev/.github/workflows/update-crds.yml
-# https://github.com/recoord/core-devops-engine-k8s-manifests/blob/main/.github/workflows/diff.yml
-
 name: Test Helm diff
 on:
   - pull_request_target
@@ -20,12 +17,6 @@ jobs:
           helm: latest
           yq: latest
 
-      - id: checkout_base
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.base_ref }}
-          path: base
-
       - id: checkout_head
         uses: actions/checkout@v4
         with:
@@ -42,7 +33,7 @@ jobs:
       - id: helm_diff
         name: Helm diff
         run: ../head/flux-helm-diff.sh
-        working-directory: ./base
+        working-directory: ./head
         env:
           TEST: "1"
           HELM_FILES: ${{ steps.all_files_helm.outputs.HELM_FILES }}
