@@ -204,7 +204,7 @@ This does however also make it difficult to dry-run (using the `helm template` c
 # - monitoring.coreos.com/v1
 ```
 
-You can verify that the APIs are read correctly from the log output of the
+You can verify that the APIs are read correctly from the log output of the "Helm diff" step of the action:
 
 ```
 Processing file "infrastructure/base/argo-workflows/helm.yaml"
