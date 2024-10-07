@@ -135,11 +135,10 @@ for helm_file in "${helm_files[@]}"; do
     return_code=0
     base_out=$(helm_template "base/${helm_file}") || return_code=$?
     if [ $return_code -eq 2 ]; then # Ignore files skipped
+        # TODO: Output warnings directly to GITHUB_OUTPUT in helm_template function?
         {
-            echo '```'
-            echo "Error rendering base ref:"
-            echo "${base_out}"
-            echo '```'
+            echo '> [!WARNING]'
+            echo "> Error rendering base ref: \`${base_out}\`"
         } >> "$GITHUB_OUTPUT"
         any_failed=1
         continue
@@ -149,11 +148,10 @@ for helm_file in "${helm_files[@]}"; do
     return_code=0
     head_out=$(helm_template "head/${helm_file}") || return_code=$?
     if [ $return_code -ne 0 ]; then
+        # TODO: Output warnings directly to GITHUB_OUTPUT in helm_template function?
         {
-            echo '```'
-            echo "Error rendering head ref:"
-            echo "${head_out}"
-            echo '```'
+            echo '> [!WARNING]'
+            echo "> Error rendering head ref: \`${head_out}\`"
         } >> "$GITHUB_OUTPUT"
         any_failed=1
         continue
