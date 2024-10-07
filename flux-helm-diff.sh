@@ -38,18 +38,41 @@ helm_template() {
     if [[ "HelmRepository" == "$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.kind' "${helm_file}")" ]]; then
         repo_type=helm
         repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.name' "${helm_file}")
-        chart=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
-        url=$(yq '. | select(.kind == "HelmRepository").spec.url' "${helm_file}")
-        version=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.version' "${helm_file}")
-        if [[ "${url}" = "oci://"* ]]; then
-            url="${url}/${chart}" # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
+        repo_url=$(yq '. | select(.kind == "HelmRepository").spec.url' "${helm_file}")
+        chart_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
+        chart_version=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.version' "${helm_file}")
+        if [[ "${repo_url}" = "oci://"* ]]; then
+            url="${repo_url}/${chart_name}" # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
+        else
+            url="${repo_url}"
         fi
+
     elif [[ "OCIRepository" == "$(yq '. | select(.kind == "HelmRelease").spec.chartRef.kind' "${helm_file}")" ]]; then
         repo_type=oci
         repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chartRef.name' "${helm_file}")
-        chart="${repo_name}"
+        chart_name="${repo_name}"
+        chart_version=$(yq '. | select(.kind == "OCIRepository").spec.ref.tag' "${helm_file}")
         url=$(yq '. | select(.kind == "OCIRepository").spec.url' "${helm_file}")
-        version=$(yq '. | select(.kind == "OCIRepository").spec.ref.tag' "${helm_file}")
+
+    elif [[ "GitRepository" == "$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.kind' "${helm_file}")" ]]; then
+        repo_type=git
+        repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.name' "${helm_file}")
+        repo_url=$(yq '. | select(.kind == "GitRepository").spec.url' "${helm_file}")
+        repo_tag=$(yq '. | select(.kind == "GitRepository").spec.ref.tag' "${helm_file}")
+        chart_name="${repo_name}"
+        chart_path=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
+
+        # Download and extract release artifact - may only work with GitHub?
+        release_id="${repo_name}_${repo_tag}"
+        mkdir -p "./tmp/${release_id}"
+        curl --no-progress-meter -Lo "${release_id}.tar.gz" "${repo_url}/archive/refs/tags/${repo_tag}.tar.gz"
+        tar -xzf "${release_id}.tar.gz" --directory "./tmp/${release_id}"
+        rm "./${release_id}.tar.gz" || true
+
+        # Find the chart directory
+        find_chart_path=$(echo "${chart_path}" | sed -e 's|^./|/|' -e 's|/$||')
+        url=$(find "./tmp/${release_id}" -type d -path "*${find_chart_path}" | head -n 1)
+
     else
         echo "Unable to determine repo type, skipping"
         echo "Unable to determine repo type, skipping" >&2
@@ -57,9 +80,10 @@ helm_template() {
     fi
 
     # Extracting chart properties
-    name=$(yq '. | select(.kind == "HelmRelease").metadata.name' "${helm_file}")
-    namespace=$(yq '. | select(.kind == "HelmRelease").metadata.namespace' "${helm_file}")
-    values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
+    release_name=$(yq '. | select(.kind == "HelmRelease").metadata.name' "${helm_file}")
+    release_namespace=$(yq '. | select(.kind == "HelmRelease").metadata.namespace' "${helm_file}")
+    chart_values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
+    chart_version="${chart_version:-N/A}" # not relevant for local charts, e.g. downloaded via GitRepository
 
     # Use Capabilities.APIVersions
     mapfile -t api_versions < <(yq '. | foot_comment' "${helm_file}" | yq '.helm-api-versions[]')
@@ -68,21 +92,24 @@ helm_template() {
     echo "${ref} repo type:         ${repo_type}" >&2
     echo "${ref} repo name:         ${repo_name}" >&2
     echo "${ref} repo/chart URL:    ${url}" >&2
-    echo "${ref} chart name:        ${chart}" >&2
-    echo "${ref} chart version:     ${version}" >&2
-    echo "${ref} release name:      ${name}" >&2
-    echo "${ref} release namespace: ${namespace}" >&2
+    echo "${ref} chart name:        ${chart_name}" >&2
+    echo "${ref} chart version:     ${chart_version}" >&2
+    echo "${ref} release name:      ${release_name}" >&2
+    echo "${ref} release namespace: ${release_namespace}" >&2
     echo "${ref} API versions:      $(IFS=,; echo "${api_versions[*]}")" >&2
 
     # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
-    if [[ "${url}" = "oci://"* ]]; then
-        chart_args=("${url}") # treat as array, to avoid adding single-quotes
+    if [[ "${url}" = "https://"* ]]; then
+        chart_args=("${chart_name}" --repo "${url}" --version "${chart_version}")  # treat as array, to avoid adding single-quotes
+    elif [[ "${url}" = "oci://"* ]]; then
+        chart_args=("${url}" --version "${chart_version}") # treat as array, to avoid adding single-quotes
     else
-        chart_args=("${chart}" --repo "${url}")
+        # Assume local path (i.e. GitRepository)
+        chart_args=("${url}") # treat as array, to avoid adding single-quotes
     fi
 
     # Render template
-    template_out=$(helm template "${name}" ${chart_args[@]} --version "${version}" -n "${namespace}" -f <(echo "${values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
+    template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
         echo "$template_out"
         echo "$template_out" >&2
         return 2
@@ -148,4 +175,5 @@ done
     echo "any_failed=$any_failed"
 } >> "$GITHUB_OUTPUT"
 
+if [ -d "./tmp" ]; then rm -rf "./tmp"; fi
 echo -e "\nAll done"
