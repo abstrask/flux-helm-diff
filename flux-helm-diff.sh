@@ -160,12 +160,14 @@ for helm_file in "${helm_files[@]}"; do
     # Template diff
     diff_out=$(diff --unified=5 <(echo "${base_out}") <(echo "${head_out}")) || true
     echo "Diff has $(echo "$diff_out" | wc -l) line(s)"
-    [ -z "${diff_out}" ] && diff_out="No changes"
-    {
+    if [[ -z "${diff_out}" ]]; then
+        echo '> [!NOTE]'
+        echo '> No changes'
+    else
         echo '```diff'
         echo "${diff_out}"
         echo '```'
-    } >> "$GITHUB_OUTPUT"
+    fi >> "$GITHUB_OUTPUT"
 done
 
 {
