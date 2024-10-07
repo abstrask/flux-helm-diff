@@ -1,0 +1,96 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: argo
+  namespace: argo
+spec:
+  interval: 15m
+  url: https://argoproj.github.io/argo-helm
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: argo-workflows
+  namespace: argo
+spec:
+  interval: 5m
+  targetNamespace: argo
+  chart:
+    spec:
+      chart: argo-workflows
+      version: "0.42.5"
+      sourceRef:
+        kind: HelmRepository
+        name: argo
+      interval: 15m
+  install:
+    skipCRDs: true
+  values:
+    crds:
+      install: false
+    useStaticCredentials: false
+    controller:
+      parallelism: 1500 # this affects apps/processing/base/synchronization.yaml
+      metricsConfig:
+        enabled: true
+        honorLabels: true
+      workflowDefaults:
+        spec:
+          podGC: # https://argoproj.github.io/argo-workflows/fields/#podgc
+            strategy: OnPodCompletion
+          ttlStrategy: # https://argoproj.github.io/argo-workflows/fields/#ttlstrategy
+            secondsAfterSuccess: 300 # 5 minutes
+            secondsAfterFailure: 86400 # 24 hours
+            secondsAfterCompletion: 86400 # 24 hours
+      priorityClassName: high-priority
+      resources:
+        requests:
+          cpu: 100m
+          memory: 10Gi
+        limits:
+          memory: 10Gi
+      extraArgs:
+        - --qps=200
+        - --burst=300
+      workflowWorkers: 64
+      workflowTTLWorkers: 16
+      podCleanupWorkers: 16
+      serviceMonitor:
+        enabled: true
+        additionalLabels:
+          instance: primary
+    server:
+      extraArgs:
+        - --auth-mode=server
+        - --kube-api-qps=120.0
+        - --kube-api-burst=180
+      priorityClassName: high-priority
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          memory: 1Gi
+      ingress:
+        enabled: true
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt
+        ingressClassName: nginx
+        hosts:
+          - ${flux_argo_instance}wf.${flux_base_domain_name}
+        pathType: Prefix
+        paths:
+          - /
+        tls:
+          - secretName: argo-tls
+            hosts:
+              - ${flux_argo_instance}wf.${flux_base_domain_name}
+      serviceAccount:
+        name: argo-workflows
+
+---
+# helm-api-versions:
+# - myapi/v0
+# - monitoring.coreos.com/v1

@@ -1,3 +1,4 @@
+<!-- omit in toc -->
 # Flux Helm chart diff action
 
 A composite GitHub Action for use with PR workflows in repos with [Flux Helm manifests](https://fluxcd.io/flux/use-cases/helm/).
@@ -13,6 +14,17 @@ Combine with these awesome projects for maximum workflow smoothness:
 - [tj-actions/changed-files](https://github.com/tj-actions/changed-files): Extract list of changed Helm files
 - [mshick/add-pr-comment](https://github.com/mshick/add-pr-comment): Add diff report as comment to PR
 - [Renovate](https://github.com/renovatebot/renovate): Automatically create PRs when new charts versions are available)
+
+<!-- omit in toc -->
+## Table of Contents
+
+- [Dependencies](#dependencies)
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+- [Usage](#usage)
+- [Dry-running/Emulating API Capabilities](#dry-runningemulating-api-capabilities)
+- [Example Output/PR comment](#example-outputpr-comment)
+- [Testing](#testing)
 
 ## Dependencies
 
@@ -35,6 +47,7 @@ In `diff_markdown` the output for each file will either be:
 
 ## Usage
 
+<!-- omit in toc -->
 ### TL;DR
 
 ```yaml
@@ -45,6 +58,7 @@ In `diff_markdown` the output for each file will either be:
     helm_files: ${{ steps.changed_files_helm.outputs.all_changed_files }}
 ```
 
+<!-- omit in toc -->
 ### Full Example
 
 Run on pull requests:
@@ -174,13 +188,40 @@ Optionally, cause check to fail, if any Helm file failed to render:
 
 See [example-workflow.yaml](example-workflow.yaml) for coherent example.
 
+
+## Dry-running/Emulating API Capabilities
+
+When installing, Helm can access the available Kubernetes APIs and versions, through "[Built-in Objects](https://helm.sh/docs/chart_template_guide/builtin_objects/)".
+
+This enable charts to deploy custom resources, or tweak properties as needed, based on the APIs offered in the cluster. For example, starting with `argo-workflows` chart 0.41.0, the `ServiceMonitor` resource doesn't even get deployed, if [`.Capabilities.APIVersions.Has`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/controller/workflow-controller-servicemonitor.yaml#L2) doesn't contain [`monitoring.coreos.com/v1`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/_helpers.tpl#L200).
+
+This does however also make it difficult to dry-run (using the `helm template` command), with no cluster access. As a workaround, it's possible to specify API version to be used when running the `template` command as commented YAML. The comments has to be the last in the file and must have the document start `---` above. Example:
+
+```yaml
+---
+# helm-api-versions:
+# - myapi/v0
+# - monitoring.coreos.com/v1
+```
+
+You can verify that the APIs are read correctly from the log output of the "Helm diff" step of the action:
+
+```
+Processing file "infrastructure/base/argo-workflows/helm.yaml"
+(...)
+head API versions:      myapi/v0,monitoring.coreos.com/v1
+(...)
+```
+
 ## Example Output/PR comment
 
+<!-- omit in toc -->
 ### infrastructure/base/dcgm-exporter/helm.yaml
 ```diff
 No changes
 ```
 
+<!-- omit in toc -->
 ### infrastructure/base/nvidia-device-plugin/helm.yaml
 ```diff
 (abbreviated)
@@ -258,13 +299,15 @@ helm_files=($(find ./test/head -type f -name 'helm.yaml' | sed "s|^./test/head/|
 GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh; cat debug.out
 ```
 
+<!-- omit in toc -->
 ### Testing files
 
-| Name                    | Scenario tested                                                              | Expected output                                 |
-| ----------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
-| `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                           | Diff shows entire rendered template as added    |
-| `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported) | TBD                                             |
-| `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                     | Diff (with potentially breaking `nodeAffinity`) |
-| `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository    | No changes                                      |
-| `weave-gitops-helmrepo` | HelmRepository with type `oci`                                               | Diff                                            |
-| `weave-gitops-ocirepo`  | OCIRepository                                                                | Diff                                            |
+| Name                    | Scenario tested                                                                          | Expected output                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `argo-workflows`        | Read API from comment in helm file (otherwise `ServiceMonitor` resource is not rendered) | Diff shows change to `ServiceMonitor`, instead of being removed |
+| `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                                       | Diff shows entire rendered template as added                    |
+| `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported)             | TBD                                                             |
+| `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                                 | Diff (with potentially breaking `nodeAffinity`)                 |
+| `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository                | No changes                                                      |
+| `weave-gitops-helmrepo` | HelmRepository with type `oci`                                                           | Diff                                                            |
+| `weave-gitops-ocirepo`  | OCIRepository                                                                            | Diff                                                            |

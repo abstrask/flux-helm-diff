@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eu -o pipefail
 
 helm_files=(${HELM_FILES[@]})
@@ -85,6 +85,9 @@ helm_template() {
     chart_values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
     chart_version="${chart_version:-N/A}" # not relevant for local charts, e.g. downloaded via GitRepository
 
+    # Use Capabilities.APIVersions
+    mapfile -t api_versions < <(yq '. | foot_comment' "${helm_file}" | yq '.helm-api-versions[]')
+
     # Let's see what information we got out about the chart...
     echo "${ref} repo type:         ${repo_type}" >&2
     echo "${ref} repo name:         ${repo_name}" >&2
@@ -93,6 +96,7 @@ helm_template() {
     echo "${ref} chart version:     ${chart_version}" >&2
     echo "${ref} release name:      ${release_name}" >&2
     echo "${ref} release namespace: ${release_namespace}" >&2
+    echo "${ref} API versions:      $(IFS=,; echo "${api_versions[*]}")" >&2
 
     # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
     if [[ "${url}" = "https://"* ]]; then
@@ -105,7 +109,7 @@ helm_template() {
     fi
 
     # Render template
-    template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}")  2>&1) || {
+    template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
         echo "$template_out"
         echo "$template_out" >&2
         return 2
