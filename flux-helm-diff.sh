@@ -8,6 +8,18 @@ if [[ "${#helm_files[@]}" == "0" ]]; then
 fi
 echo "${#helm_files[@]} Helm file(s) to render: ${helm_files[*]}"
 
+output_msg() {
+    if [[ -z "${2}" ]]; then
+        echo "Need severity and message text" >&2
+        return 1
+    fi
+    {
+        echo "> [!${1}]"
+        echo "> ${2}"
+        echo
+    } >> "$GITHUB_OUTPUT"
+}
+
 helm_template() {
     set -eu -o pipefail
 
@@ -16,10 +28,7 @@ helm_template() {
 
     if [[ -z "${1}" ]]; then
         echo "Error: Need ${ref} file name to template" >&2
-        {
-            echo '> [!CAUTION]'
-            echo "> Error: Need \`${ref}\` file name to template"
-        } >> "$GITHUB_OUTPUT"
+        output_msg CAUTION "Error: Need \`${ref}\` file name to template"
         return 1
     fi
 
@@ -33,18 +42,10 @@ helm_template() {
     if [ ! -f "${helm_file}" ]; then
         echo "${ref} file \"${helm_file}\" not found" >&2
         if [[ "${ref}" == "base" ]]; then
-            {
-                echo '> [!TIP]'
-                echo "> File \`${helm_file}\` not found in \`${ref}\` ref, looks like a new Helm file"
-                echo
-            } >> "$GITHUB_OUTPUT"
+            output_msg TIP "File \`${helm_file}\` not found in \`${ref}\` ref, looks like a new Helm file"
             return
         else
-            {
-                echo '> [!CAUTION]'
-                echo "> Error: File \`${helm_file}\` not found in \`${ref}\` ref, cannot produce diff"
-                echo
-            } >> "$GITHUB_OUTPUT"
+            output_msg CAUTION "Error: File \`${helm_file}\` not found in \`${ref}\` ref, cannot produce diff"
             return 1
         fi
     fi
@@ -94,18 +95,10 @@ helm_template() {
     else
         echo "Unrecognised ${ref} repo type" >&2
         if [[ "${ref}" == "base" ]]; then
-            {
-                echo '> [!TIP]'
-                echo "> Unable to determine \`${ref}\` repo type, not rendering template"
-                echo
-            } >> "$GITHUB_OUTPUT"
+            output_msg TIP "Unable to determine \`${ref}\` repo type, not rendering template"
             return
         else
-            {
-                echo '> [!CAUTION]'
-                echo "> Error: Unable to determine \`${ref}\` repo type, cannot produce diff"
-                echo
-            } >> "$GITHUB_OUTPUT"
+            output_msg CAUTION "Error: Unable to determine \`${ref}\` repo type, cannot produce diff"
             return 1
         fi
     fi
@@ -142,11 +135,7 @@ helm_template() {
     # Render template
     template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
         echo "$template_out" >&2
-        {
-            echo '> [!CAUTION]'
-            echo "> Error rendering \`${ref}\` ref: \`${template_out}\`"
-            echo
-        } >> "$GITHUB_OUTPUT"
+        output_msg CAUTION "Error rendering \`${ref}\` ref: \`${template_out}\`"
         return 1
     }
 
@@ -164,8 +153,11 @@ for helm_file in "${helm_files[@]}"; do
 
     # Begin output
     echo -e "\nProcessing file \"$helm_file\""
-    echo >> "$GITHUB_OUTPUT"
-    echo "### \`${helm_file}\`" >> "$GITHUB_OUTPUT"
+    {
+        echo
+        echo "### \`${helm_file}\`"
+        echo
+    } >> "$GITHUB_OUTPUT"
 
     # Template before
     base_out=$(helm_template "base/${helm_file}") || {
