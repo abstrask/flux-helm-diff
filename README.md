@@ -22,7 +22,7 @@ Combine with these awesome projects for maximum workflow smoothness:
 - [Inputs](#inputs)
 - [Outputs](#outputs)
 - [Usage](#usage)
-- [Dry-running/Emulating API Capabilities](#dry-runningemulating-api-capabilities)
+- [Dry-running/Emulating Capabilities](#dry-runningemulating-capabilities)
 - [Example Output/PR comment](#example-outputpr-comment)
 - [Testing](#testing)
 
@@ -189,19 +189,25 @@ Optionally, cause check to fail, if any Helm file failed to render:
 See [example-workflow.yaml](example-workflow.yaml) for coherent example.
 
 
-## Dry-running/Emulating API Capabilities
+## Dry-running/Emulating Capabilities
 
-When installing, Helm can access the available Kubernetes APIs and versions, through "[Built-in Objects](https://helm.sh/docs/chart_template_guide/builtin_objects/)".
+When installing, Helm can access the Kubernetes version and available Kubernetes APIs and versions, through "[Built-in Objects](https://helm.sh/docs/chart_template_guide/builtin_objects/)".
 
-This enable charts to deploy custom resources, or tweak properties as needed, based on the APIs offered in the cluster. For example, starting with `argo-workflows` chart 0.41.0, the `ServiceMonitor` resource doesn't even get deployed, if [`.Capabilities.APIVersions.Has`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/controller/workflow-controller-servicemonitor.yaml#L2) doesn't contain [`monitoring.coreos.com/v1`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/_helpers.tpl#L200).
+This enable charts to deploy custom resources, or tweak properties as needed, based on the features introduced in specific Kubernetes versions, or APIs offered in the cluster.
+
+For example, starting with `argo-workflows` chart 0.41.0, the `ServiceMonitor` resource doesn't even get deployed, if [`.Capabilities.APIVersions.Has`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/controller/workflow-controller-servicemonitor.yaml#L2) doesn't contain [`monitoring.coreos.com/v1`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/_helpers.tpl#L200).
+
+Another example...
 
 This does however also make it difficult to dry-run (using the `helm template` command), with no cluster access. As a workaround, it's possible to specify API version to be used when running the `template` command as commented YAML. The comments has to be the last in the file and must have the document start `---` above. Example:
 
 ```yaml
 ---
-# helm-api-versions:
-# - myapi/v0
-# - monitoring.coreos.com/v1
+# flux-helm-diff:
+#   kube-version: 1.30
+#   api-versions:
+#   - myapi/v0
+#   - monitoring.coreos.com/v1
 ```
 
 You can verify that the APIs are read correctly from the log output of the "Helm diff" step of the action:
@@ -209,7 +215,8 @@ You can verify that the APIs are read correctly from the log output of the "Helm
 ```
 Processing file "infrastructure/base/argo-workflows/helm.yaml"
 (...)
-head API versions:      myapi/v0,monitoring.coreos.com/v1
+head simulate Kube version: 1.30
+head API versions:          myapi/v0,monitoring.coreos.com/v1
 (...)
 ```
 
@@ -302,13 +309,14 @@ GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh
 <!-- omit in toc -->
 ### Testing files
 
-| Name                    | Scenario tested                                                                          | Expected output                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `argo-workflows`        | Read API from comment in helm file (otherwise `ServiceMonitor` resource is not rendered) | Diff shows change to `ServiceMonitor`, instead of being removed |
-| `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                                       | Diff shows entire rendered template as added                    |
-| `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported)             | TBD                                                             |
-| `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                                 | Diff (with potentially breaking `nodeAffinity`)                 |
-| `podinfo`               | Unknown repository type (`HelmTypoRepository`)                                           | `Unrecognised repo type`                                        |
-| `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository                | No changes                                                      |
-| `weave-gitops-helmrepo` | HelmRepository with type `oci`                                                           | Diff                                                            |
-| `weave-gitops-ocirepo`  | OCIRepository                                                                            | Diff                                                            |
+| Name                    | Scenario tested                                                                          | Expected output                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `argo-workflows`        | Read API from comment in helm file (otherwise `ServiceMonitor` resource is not rendered) | Diff shows change to `ServiceMonitor`, instead of being removed                |
+| `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                                       | Diff shows entire rendered template as added                                   |
+| `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported)             | TBD                                                                            |
+| `metrics-server`        | Kube Version simulation in `head`, using newer API version for `PodDisruptionBudget`     | `PodDisruptionBudget` changes API version from `policy/v1beta1` to `policy/v1` |
+| `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                                 | Diff (with potentially breaking `nodeAffinity`)                                |
+| `podinfo`               | Unknown repository type (`HelmTypoRepository`)                                           | `Unrecognised repo type`                                                       |
+| `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository                | No changes                                                                     |
+| `weave-gitops-helmrepo` | HelmRepository with type `oci`                                                           | Diff                                                                           |
+| `weave-gitops-ocirepo`  | OCIRepository                                                                            | Diff                                                                           |
