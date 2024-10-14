@@ -14,8 +14,15 @@ output_msg() {
         return 1
     fi
     {
+        # Alert level - https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts
         echo "> [!${1}]"
-        echo "> ${2}"
+        shift
+
+        # Message line(s)
+        for msg in "$@"; do
+            echo "> ${msg}"
+            echo '>'
+        done
         echo
     } >> "$GITHUB_OUTPUT"
 }
@@ -158,8 +165,14 @@ helm_template() {
     echo "${ref} release namespace: ${release_namespace}" >&2
     echo "${ref} API versions:      $(IFS=,; echo "${api_versions[*]}")" >&2
 
-    # TO DO:
-    # grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.APIVersions" "${chart_temp_path}" > /dev/null && echo "Warning"
+    # Inspect rendered manifests - head only?
+    if [[ "${ref}" == "head" ]]; then
+        grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.APIVersions" "${chart_temp_path}" > /dev/null && {
+            echo "Warning: Chart uses \".Capabilities.APIVersions\"" >&2
+            output_msg WARNING "Chart uses the \`.Capabilities.APIVersions\` [built-in template object](https://helm.sh/docs/chart_template_guide/builtin_objects/), which can affect rendered manifests." \
+                "See [Flux Helm Diff read-me](https://github.com/marketplace/actions/flux-helm-diff#dry-runningemulating-api-capabilities) for details and workaround."
+        }
+    fi
 
     # Render template
     return_code=0
