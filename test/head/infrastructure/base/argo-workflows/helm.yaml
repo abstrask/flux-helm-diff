@@ -91,6 +91,8 @@ spec:
         name: argo-workflows
 
 ---
-# helm-api-versions:
-# - myapi/v0
-# - monitoring.coreos.com/v1
+# flux-helm-diff:
+#   kube-version: 1.30
+#   api-versions:
+#   - myapi/v0
+#   - monitoring.coreos.com/v1
