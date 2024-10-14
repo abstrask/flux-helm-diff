@@ -2,7 +2,7 @@
 set -eu -o pipefail
 
 helm_files=(${HELM_FILES[@]})
-if [ "${#helm_files[@]}" == "0" ]; then
+if [[ "${#helm_files[@]}" == "0" ]]; then
     echo "No Helm files specified, nothing to do"
     exit
 fi
@@ -10,15 +10,20 @@ echo "${#helm_files[@]} Helm file(s) to render: ${helm_files[*]}"
 
 helm_template() {
     set -eu -o pipefail
-    if [ -z "${1}" ]; then
-        echo "Error: Need file name to template" >&2
-        return 2
-    fi
 
     # 'head' or 'base' ref - used for logging output
     ref="${1%%/*}"
 
-    # Set test = <something> to run against Helm teplates under test/
+    if [[ -z "${1}" ]]; then
+        echo "Error: Need ${ref} file name to template" >&2
+        {
+            echo '> [!CAUTION]'
+            echo "> Error: Need \`${ref}\` file name to template"
+        } >> "$GITHUB_OUTPUT"
+        return 1
+    fi
+
+    # Set test = <something> to run against Helm teplates under test/ directory
     if [ -z "${TEST:-}" ]; then
         helm_file="${1}"
     else
@@ -26,9 +31,22 @@ helm_template() {
     fi
 
     if [ ! -f "${helm_file}" ]; then
-        # echo "Warn: File \"${helm_file}\" not found, skipping"
-        echo "File \"${helm_file}\" not found, skipping" >&2
-        return 1
+        echo "${ref} file \"${helm_file}\" not found" >&2
+        if [[ "${ref}" == "base" ]]; then
+            {
+                echo '> [!TIP]'
+                echo "> File \`${helm_file}\` not found in \`${ref}\` ref, looks like a new Helm file"
+                echo
+            } >> "$GITHUB_OUTPUT"
+            return
+        else
+            {
+                echo '> [!CAUTION]'
+                echo "> Error: File \`${helm_file}\` not found in \`${ref}\` ref, cannot produce diff"
+                echo
+            } >> "$GITHUB_OUTPUT"
+            return 1
+        fi
     fi
 
     # Determine repo type - HelmRepository or OCIRepository
@@ -74,9 +92,22 @@ helm_template() {
         url=$(find "./tmp/${release_id}" -type d -path "*${find_chart_path}" | head -n 1)
 
     else
-        echo "Unable to determine repo type, skipping"
-        echo "Unable to determine repo type, skipping" >&2
-        return 2
+        echo "Unrecognised ${ref} repo type" >&2
+        if [[ "${ref}" == "base" ]]; then
+            {
+                echo '> [!TIP]'
+                echo "> Unable to determine \`${ref}\` repo type, not rendering template"
+                echo
+            } >> "$GITHUB_OUTPUT"
+            return
+        else
+            {
+                echo '> [!CAUTION]'
+                echo "> Error: Unable to determine \`${ref}\` repo type, cannot produce diff"
+                echo
+            } >> "$GITHUB_OUTPUT"
+            return 1
+        fi
     fi
 
     # Extracting chart properties
@@ -110,9 +141,13 @@ helm_template() {
 
     # Render template
     template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
-        echo "$template_out"
         echo "$template_out" >&2
-        return 2
+        {
+            echo '> [!CAUTION]'
+            echo "> Error rendering \`${ref}\` ref: \`${template_out}\`"
+            echo
+        } >> "$GITHUB_OUTPUT"
+        return 1
     }
 
     # Cleanup template, removing comments, output
@@ -126,36 +161,23 @@ echo "## Flux Helm diffs" >> "$GITHUB_OUTPUT"
 
 any_failed=0
 for helm_file in "${helm_files[@]}"; do
+
     # Begin output
     echo -e "\nProcessing file \"$helm_file\""
     echo >> "$GITHUB_OUTPUT"
-    echo "### ${helm_file}" >> "$GITHUB_OUTPUT"
+    echo "### \`${helm_file}\`" >> "$GITHUB_OUTPUT"
 
     # Template before
-    return_code=0
-    base_out=$(helm_template "base/${helm_file}") || return_code=$?
-    if [ $return_code -eq 2 ]; then # Ignore files skipped
-        # TODO: Output warnings directly to GITHUB_OUTPUT in helm_template function?
-        {
-            echo '> [!WARNING]'
-            echo "> Error rendering base ref: \`${base_out}\`"
-        } >> "$GITHUB_OUTPUT"
+    base_out=$(helm_template "base/${helm_file}") || {
         any_failed=1
         continue
-    fi
+    }
 
     # Template after
-    return_code=0
-    head_out=$(helm_template "head/${helm_file}") || return_code=$?
-    if [ $return_code -ne 0 ]; then
-        # TODO: Output warnings directly to GITHUB_OUTPUT in helm_template function?
-        {
-            echo '> [!WARNING]'
-            echo "> Error rendering head ref: \`${head_out}\`"
-        } >> "$GITHUB_OUTPUT"
+    head_out=$(helm_template "head/${helm_file}") || {
         any_failed=1
         continue
-    fi
+    }
 
     # Template diff
     diff_out=$(diff --unified=5 <(echo "${base_out}") <(echo "${head_out}")) || true
@@ -168,6 +190,7 @@ for helm_file in "${helm_files[@]}"; do
         echo "${diff_out}"
         echo '```'
     fi >> "$GITHUB_OUTPUT"
+
 done
 
 {
