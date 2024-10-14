@@ -308,6 +308,7 @@ GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh
 | `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                                       | Diff shows entire rendered template as added                    |
 | `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported)             | TBD                                                             |
 | `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                                 | Diff (with potentially breaking `nodeAffinity`)                 |
+| `podinfo`               | Unknown repository type (`HelmTypoRepository`)                                           | `Unrecognised repo type`                                        |
 | `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository                | No changes                                                      |
 | `weave-gitops-helmrepo` | HelmRepository with type `oci`                                                           | Diff                                                            |
 | `weave-gitops-ocirepo`  | OCIRepository                                                                            | Diff                                                            |
