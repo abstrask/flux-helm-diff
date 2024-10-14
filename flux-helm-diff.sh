@@ -50,7 +50,12 @@ helm_template() {
         fi
     fi
 
-    # Determine repo type - HelmRepository or OCIRepository
+    # Extracting chart properties
+    release_name=$(yq '. | select(.kind == "HelmRelease").metadata.name' "${helm_file}")
+    release_namespace=$(yq '. | select(.kind == "HelmRelease").metadata.namespace' "${helm_file}")
+    chart_values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
+
+    # Determine repo type
     # https://fluxcd.io/flux/components/source/helmrepositories/
     # https://fluxcd.io/flux/components/source/ocirepositories/
     # https://fluxcd.io/flux/components/source/gitrepositories/
@@ -58,8 +63,10 @@ helm_template() {
         repo_type=helm
         repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.name' "${helm_file}")
         repo_url=$(yq '. | select(.kind == "HelmRepository").spec.url' "${helm_file}")
+
         chart_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
         chart_version=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.version' "${helm_file}")
+
         if [[ "${repo_url}" = "oci://"* ]]; then
             url="${repo_url}/${chart_name}" # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
         else
@@ -69,8 +76,10 @@ helm_template() {
     elif [[ "OCIRepository" == "$(yq '. | select(.kind == "HelmRelease").spec.chartRef.kind' "${helm_file}")" ]]; then
         repo_type=oci
         repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chartRef.name' "${helm_file}")
+
         chart_name="${repo_name}"
         chart_version=$(yq '. | select(.kind == "OCIRepository").spec.ref.tag' "${helm_file}")
+
         url=$(yq '. | select(.kind == "OCIRepository").spec.url' "${helm_file}")
 
     elif [[ "GitRepository" == "$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.kind' "${helm_file}")" ]]; then
@@ -78,19 +87,12 @@ helm_template() {
         repo_name=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.sourceRef.name' "${helm_file}")
         repo_url=$(yq '. | select(.kind == "GitRepository").spec.url' "${helm_file}")
         repo_tag=$(yq '. | select(.kind == "GitRepository").spec.ref.tag' "${helm_file}")
+
         chart_name="${repo_name}"
-        chart_path=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
+        chart_version="${repo_tag}"
+        chart_rel_path=$(yq '. | select(.kind == "HelmRelease").spec.chart.spec.chart' "${helm_file}")
 
-        # Download and extract release artifact - may only work with GitHub?
-        release_id="${repo_name}_${repo_tag}"
-        mkdir -p "./tmp/${release_id}"
-        curl --no-progress-meter -Lo "${release_id}.tar.gz" "${repo_url}/archive/refs/tags/${repo_tag}.tar.gz"
-        tar -xzf "${release_id}.tar.gz" --directory "./tmp/${release_id}"
-        rm "./${release_id}.tar.gz" || true
-
-        # Find the chart directory
-        find_chart_path=$(echo "${chart_path}" | sed -e 's|^./|/|' -e 's|/$||')
-        url=$(find "./tmp/${release_id}" -type d -path "*${find_chart_path}" | head -n 1)
+        url="${repo_url}/archive/refs/tags/${repo_tag}.tar.gz"
 
     else
         echo "Unrecognised ${ref} repo type" >&2
@@ -103,11 +105,45 @@ helm_template() {
         fi
     fi
 
-    # Extracting chart properties
-    release_name=$(yq '. | select(.kind == "HelmRelease").metadata.name' "${helm_file}")
-    release_namespace=$(yq '. | select(.kind == "HelmRelease").metadata.namespace' "${helm_file}")
-    chart_values=$(yq '. | select(.kind == "HelmRelease").spec.values' "${helm_file}")
-    chart_version="${chart_version:-N/A}" # not relevant for local charts, e.g. downloaded via GitRepository
+    # Download chart
+    release_id="${chart_name}-${chart_version}"
+    chart_temp_path="./tmp/${release_name}-${release_id}-${ref}"
+    mkdir -p "${chart_temp_path}"
+    if [[ "${repo_type}" != "git" ]]; then
+        # Syntax for pull Helm charts is different for OCI repos
+        if [[ "${url}" = "https://"* ]]; then
+            helm_pull_args=("${chart_name}" --repo "${url}")  # treat as array, to avoid adding single-quotes
+        elif [[ "${url}" = "oci://"* ]]; then
+            helm_pull_args=("${url}") # treat as array, to avoid adding single-quotes
+        else
+            echo "Unrecognised ${ref} repo type. Again. This should already be caught, so this should never happen.">&2
+            return 1
+        fi
+        chart_file="${chart_temp_path}/${release_id}.tgz"
+        helm pull ${helm_pull_args[@]} --version "${chart_version}" -d "${chart_temp_path}" || {
+            echo "Helm failed to pull \"${url}\" to \"${chart_temp_path}\"" >&2
+            output_msg CAUTION "Helm failed to pull \`${url}\` to \`${chart_temp_path}\`"
+            return 1
+        }
+    else
+        # Probably only works with GitHub
+        chart_file="${chart_temp_path}/asset.tgz"
+        curl --no-progress-meter -Lo "${chart_file}" "${url}" || {
+            echo "cURL failed to download \"${url}\" to \"${chart_file}\"" >&2
+            output_msg CAUTION "cURL failed to download \`${url}\` to \`${chart_file}\`"
+            return 1
+        }
+    fi
+
+    # Extract chart
+    tar -xzf "${chart_file}" --directory "${chart_temp_path}"
+    rm "${chart_file}" || true
+    if [[ "${repo_type}" == "git" ]]; then
+        find_chart_path=$(echo "${chart_rel_path}" | sed -e 's|^./|/|' -e 's|/$||')
+        chart_path=$(find "${chart_temp_path}" -type d -path "*${find_chart_path}" | head -n 1)
+    else
+        chart_path="${chart_temp_path}/${chart_name}"
+    fi
 
     # Use Capabilities.APIVersions
     mapfile -t api_versions < <(yq '. | foot_comment' "${helm_file}" | yq '.helm-api-versions[]')
@@ -122,22 +158,18 @@ helm_template() {
     echo "${ref} release namespace: ${release_namespace}" >&2
     echo "${ref} API versions:      $(IFS=,; echo "${api_versions[*]}")" >&2
 
-    # Syntax for chart repos is different from OCI repos (as HelmRepo kind)
-    if [[ "${url}" = "https://"* ]]; then
-        chart_args=("${chart_name}" --repo "${url}" --version "${chart_version}")  # treat as array, to avoid adding single-quotes
-    elif [[ "${url}" = "oci://"* ]]; then
-        chart_args=("${url}" --version "${chart_version}") # treat as array, to avoid adding single-quotes
-    else
-        # Assume local path (i.e. GitRepository)
-        chart_args=("${url}") # treat as array, to avoid adding single-quotes
-    fi
+    # TO DO:
+    # grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.APIVersions" "${chart_temp_path}" > /dev/null && echo "Warning"
 
     # Render template
-    template_out=$(helm template "${release_name}" ${chart_args[@]} -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || {
+    return_code=0
+    template_out=$(helm template "${release_name}" "${chart_path}" -n "${release_namespace}" -f <(echo "${chart_values}") --api-versions "$(IFS=,; echo "${api_versions[*]}")" 2>&1) || return_code=$?
+    rm -rf "${chart_temp_path}"
+    if [ $return_code -ne 0 ]; then
         echo "$template_out" >&2
         output_msg CAUTION "Error rendering \`${ref}\` ref: \`${template_out}\`"
         return 1
-    }
+    fi
 
     # Cleanup template, removing comments, output
     template_clean=$(yq -P 'sort_keys(..) comments=""' <(echo "${template_out}"))
