@@ -22,7 +22,7 @@ Combine with these awesome projects for maximum workflow smoothness:
 - [Inputs](#inputs)
 - [Outputs](#outputs)
 - [Usage](#usage)
-- [Dry-running/Emulating Capabilities](#dry-runningemulating-capabilities)
+- [Simulating Capabilities](#simulating-capabilities)
 - [Example Output/PR comment](#example-outputpr-comment)
 - [Testing](#testing)
 
@@ -188,8 +188,7 @@ Optionally, cause check to fail, if any Helm file failed to render:
 
 See [example-workflow.yaml](example-workflow.yaml) for coherent example.
 
-
-## Dry-running/Emulating Capabilities
+## Simulating Capabilities
 
 When installing, Helm can access the Kubernetes version and available Kubernetes APIs and versions, through "[Built-in Objects](https://helm.sh/docs/chart_template_guide/builtin_objects/)".
 
@@ -197,9 +196,9 @@ This enable charts to deploy custom resources, or tweak properties as needed, ba
 
 For example, starting with `argo-workflows` chart 0.41.0, the `ServiceMonitor` resource doesn't even get deployed, if [`.Capabilities.APIVersions.Has`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/controller/workflow-controller-servicemonitor.yaml#L2) doesn't contain [`monitoring.coreos.com/v1`](https://github.com/argoproj/argo-helm/blob/argo-workflows-0.41.0/charts/argo-workflows/templates/_helpers.tpl#L200).
 
-Another example...
+By default, Helm will use the Kubernetes version included in the tool, and the built-in API versions in this version. These are printed in the beginning of the logs of the GitHub Action for clarity.
 
-This does however also make it difficult to dry-run (using the `helm template` command), with no cluster access. As a workaround, it's possible to specify API version to be used when running the `template` command as commented YAML. The comments has to be the last in the file and must have the document start `---` above. Example:
+If needed, the Kubernetes version used for templating can be overriden, and *additional* API versions can be specified in the `helm.yaml` file in the form of a small commented YAML document. The comments has to be the last in the file and must have the document start `---` marker above. Example:
 
 ```yaml
 ---
