@@ -174,8 +174,8 @@ helm_template() {
     grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.KubeVersion" "${chart_temp_path}" > /dev/null && {
         echo "${ref} uses \".Capabilities.KubeVersion\"" >&2
         if [[ ${#kube_version} -eq 0 ]]; then
-            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying a Kubernetes version to simulate." \
-                "See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details. Will use Helm's default Kubernetes version: \`${helm_default_kube_version}\`."
+            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying a Kubernetes version to simulate. Will use Helm's default Kubernetes version: \`${helm_default_kube_version}\`." \
+                "See [Simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details."
             helm_kube_version=() # treat as array, to avoid adding single-quotes
         else
             output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following Kubernetes version: \`${kube_version}\`"
@@ -187,10 +187,10 @@ helm_template() {
     grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.APIVersions" "${chart_temp_path}" > /dev/null && {
         echo "${ref} uses \".Capabilities.APIVersions\"" >&2
         if [[ ${#api_versions[@]} -eq 0 ]]; then
-            output_msg IMPORTANT "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying any APIs to simulate." \
-                "Only the built-in API versions are available for templating. See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details and workaround."
+            output_msg IMPORTANT "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying any APIs to simulate. Only the built-in API versions are available for templating." \
+                "See [Simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details."
         else
-            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following APIs:" \
+            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following APIs, in addition to the built-in:" \
                 "$(printf "\`%s\`\n" "${api_versions[@]}")"
         fi
     }
