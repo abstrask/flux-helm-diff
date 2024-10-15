@@ -49,10 +49,10 @@ helm_template() {
     if [ ! -f "${helm_file}" ]; then
         echo "${ref} file \"${helm_file}\" not found" >&2
         if [[ "${ref}" == "base" ]]; then
-            output_msg TIP "File \`${helm_file}\` not found in \`${ref}\` ref, looks like a new Helm file."
+            output_msg TIP "Helm file not found in \`${ref}\` ref, looks like a new Helm file."
             return
         else
-            output_msg CAUTION "Error: File \`${helm_file}\` not found in \`${ref}\` ref, cannot produce diff."
+            output_msg CAUTION "Error: Helm file not found in \`${ref}\` ref, cannot produce diff."
             return 1
         fi
     fi
@@ -172,10 +172,10 @@ helm_template() {
 
     # Check if chart is using .Capabilities.KubeVersion
     grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.KubeVersion" "${chart_temp_path}" > /dev/null && {
-        echo "${ref} chart uses \".Capabilities.KubeVersion\"" >&2
+        echo "${ref} uses \".Capabilities.KubeVersion\"" >&2
         if [[ ${#kube_version} -eq 0 ]]; then
-            output_msg WARNING "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying a Kubernetes version to simulate." \
-                "This can affect rendered manifests. See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#dry-runningsimulating-capabilities) for details and workaround."
+            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying a Kubernetes version to simulate." \
+                "See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details. Will use Helm's default Kubernetes version: \`${helm_default_kube_version}\`."
             helm_kube_version=() # treat as array, to avoid adding single-quotes
         else
             output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.KubeVersion\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following Kubernetes version: \`${kube_version}\`"
@@ -185,10 +185,10 @@ helm_template() {
 
     # Check if chart is using .Capabilities.APIVersions
     grep -R --include='*.yaml' --include='*.yml' --include='*.tpl' ".Capabilities.APIVersions" "${chart_temp_path}" > /dev/null && {
-        echo "${ref} chart uses \".Capabilities.APIVersions\"" >&2
+        echo "${ref} uses \".Capabilities.APIVersions\"" >&2
         if [[ ${#api_versions[@]} -eq 0 ]]; then
-            output_msg WARNING "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying any APIs to simulate." \
-                "This can affect rendered manifests. See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#dry-runningsimulating-capabilities) for details and workaround."
+            output_msg IMPORTANT "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying any APIs to simulate." \
+                "Only the built-in API versions are available for templating. See [Dry-running/simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details and workaround."
         else
             output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following APIs:" \
                 "$(printf "\`%s\`\n" "${api_versions[@]}")"
@@ -210,6 +210,13 @@ helm_template() {
     echo "$template_clean"
 }
 
+# Get default Helm capabilities
+helm_capabilities=$(helm template --repo https://abstrask.github.io/helm-charts helm-capabilities) || true
+helm_default_kube_version=$(yq '.helmCapabilities.kubeVersion' <<< "${helm_capabilities}")
+echo -e "\nHelm default Kubernetes version: ${helm_default_kube_version}"
+kube_api_versions=$(yq '.helmCapabilities.apiVersions' <<< "${helm_capabilities}")
+echo -e "\nHelm built-in API versions:\n${kube_api_versions}"
+
 EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
 echo "markdown<<$EOF" > "$GITHUB_OUTPUT"
 echo "## Flux Helm diffs" >> "$GITHUB_OUTPUT"
@@ -219,11 +226,7 @@ for helm_file in "${helm_files[@]}"; do
 
     # Begin output
     echo -e "\nProcessing file \"$helm_file\""
-    {
-        echo
-        echo "### \`${helm_file}\`"
-        echo
-    } >> "$GITHUB_OUTPUT"
+    echo -e "\n### \`${helm_file}\`\n" >> "$GITHUB_OUTPUT"
 
     # Template before
     base_out=$(helm_template "base/${helm_file}") || {
