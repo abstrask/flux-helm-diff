@@ -190,7 +190,7 @@ helm_template() {
             output_msg IMPORTANT "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) but is not specifying any APIs to simulate. Only the built-in API versions are available for templating." \
                 "See [Simulating Capabilities](https://github.com/marketplace/actions/flux-helm-diff#simulating-capabilities) for details."
         else
-            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following APIs:" \
+            output_msg TIP "Chart in \`${ref}\` ref uses [\`.Capabilities.APIVersions\`](https://helm.sh/docs/chart_template_guide/builtin_objects/) and is simulating the following APIs, in addition to the built-in:" \
                 "$(printf "\`%s\`\n" "${api_versions[@]}")"
         fi
     }
