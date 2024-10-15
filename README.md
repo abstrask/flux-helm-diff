@@ -313,7 +313,7 @@ GITHUB_OUTPUT=debug.out HELM_FILES="${helm_files[@]}" TEST=1 ./flux-helm-diff.sh
 | `argo-workflows`        | Read API from comment in helm file (otherwise `ServiceMonitor` resource is not rendered) | Diff shows change to `ServiceMonitor`, instead of being removed                |
 | `dcgm-exporter`         | Chart added in `head` that doesn't exist in `base`                                       | Diff shows entire rendered template as added                                   |
 | `metaflow`              | Very non-standard way of publishing charts (not sure if should be supported)             | TBD                                                                            |
-| `metrics-server`        | Kube Version simulation in `head`, using newer API version for `PodDisruptionBudget`     | `PodDisruptionBudget` changes API version from `policy/v1beta1` to `policy/v1` |
+| `metrics-server`        | Old Kube Version simulated in `base`, using Helm's default in `head`                     | `PodDisruptionBudget` changes API version from `policy/v1beta1` to `policy/v1` |
 | `nvidia-device-plugin`  | HelmRepository (using `https`), minor chart version bump                                 | Diff (with potentially breaking `nodeAffinity`)                                |
 | `podinfo`               | Unknown repository type (`HelmTypoRepository`)                                           | `Unrecognised repo type`                                                       |
 | `weave-gitops-helm2oci` | Repository type changed from HelmRepository (type `oci`) to OCIRepository                | No changes                                                                     |
