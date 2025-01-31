@@ -21,7 +21,6 @@ output_msg() {
         # Message line(s)
         for msg in "$@"; do
             echo "> ${msg}"
-            echo '>'
         done
         echo
     } >> "$GITHUB_OUTPUT"
