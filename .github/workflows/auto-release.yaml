@@ -2,6 +2,18 @@ name: Auto release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_bump_version:
+        description: "Version bump for auto-release"
+        type: choice
+        options:
+          - norelease
+          - patch
+          - minor
+          - major
+      running_fallback_tag:
+        description: "Update running release for tag"
+        type: string
   push:
     branches: ["main"]
     paths-ignore:
@@ -19,13 +31,13 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - uses: actions/checkout@v5
       - id: release
         uses: rymndhng/release-on-push-action@v0.28.0
         with:
-          bump_version_scheme: norelease
+          bump_version_scheme: ${{ inputs.release_bump_version || 'norelease' }}
           tag_prefix: "v"
-      - uses: actions/checkout@v5
       - uses: sersoft-gmbh/running-release-tags-action@v3
-
+        if: ${{ (steps.release.outputs.tag_name || inputs.running_fallback_tag) != '' }}
         with:
-          tag: ${{ steps.release.outputs.tag_name }}
+          tag: ${{ steps.release.outputs.tag_name || inputs.running_fallback_tag }}
