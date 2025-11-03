@@ -1,0 +1,31 @@
+name: Auto release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - ".github/**"
+      - ".gitignore"
+      - "**/*.md"
+      - "test/**"
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - id: release
+        uses: rymndhng/release-on-push-action@v0.28.0
+        with:
+          bump_version_scheme: norelease
+          tag_prefix: "v"
+      - uses: actions/checkout@v5
+      - uses: sersoft-gmbh/running-release-tags-action@v3
+
+        with:
+          tag: ${{ steps.release.outputs.tag_name }}
