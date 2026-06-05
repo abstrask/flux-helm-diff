@@ -1,0 +1,59 @@
+name: Test Helm diff (PR)
+
+on:
+  pull_request:
+    # Triggers safely on all PRs, including forks
+    types: [opened, synchronize, reopened]
+
+jobs:
+  helm_diff_execute:
+    name: Diff changed Helm templates
+    runs-on: ubuntu-latest
+    # Explicitly drop all permissions for maximum security
+    permissions:
+      contents: read
+
+    steps:
+      - id: dependencies
+        name: Install dependencies
+        uses: alexellis/arkade-get@b2570df8acfd04f8ae2e2ea440c24ab6cdca9646 # 2026-05-18
+        with:
+          helm: latest
+          yq: latest
+
+      - id: checkout_head
+        name: Checkout untrusted PR code
+        uses: actions/checkout@v4
+        with:
+          # Checks out the actual PR branch, but safely in read-only mode
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+
+      - name: Get all Helm files
+        id: all_files_helm
+        run: |
+          helm_files=($(find ./head/test/head -type f -name 'helm.yaml' | sed "s|^./head/test/head/||" | sort))
+          echo HELM_FILES="${helm_files[@]}" >> $GITHUB_OUTPUT
+          ls -lR
+
+      - id: helm_diff
+        name: Run Helm diff script
+        # We pipe the output directly to a file instead of saving it to a variable
+        run: ../head/flux-helm-diff.sh > ../diff-results.md
+        working-directory: ./head
+        env:
+          TEST: "1"
+          HELM_FILES: ${{ steps.all_files_helm.outputs.HELM_FILES }}
+        shell: bash
+
+      - name: Save PR number for the next workflow
+        run: echo ${{ github.event.pull_request.number }} > pr-number.txt
+
+      - name: Upload diff and PR number as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-diff-data
+          path: |
+            diff-results.md
+            pr-number.txt
+          retention-days: 1 # Only needed briefly for the next workflow
